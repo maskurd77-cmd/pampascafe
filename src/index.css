@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  --color-neutral-50: #fcfcfc;
+  --color-neutral-200: #e0e0e0;
+  --color-neutral-500: #666666;
+}
+
+body {
+  background-color: #ffffff;
+  color: #000000;
+}
