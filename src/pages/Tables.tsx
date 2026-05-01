@@ -49,17 +49,7 @@ export default function Tables() {
     }
   };
 
-  const cycleStatus = async (e: React.MouseEvent, id: string, currentStatus: string) => {
-    e.stopPropagation();
-    const nextStatus = currentStatus === "free" ? "busy" : currentStatus === "busy" ? "reserved" : "free";
-    await safeAwait(
-      updateDoc(doc(db, "tables", id), { status: nextStatus }),
-      undefined,
-      "هەڵە لە گۆڕینی دۆخ",
-      OperationType.UPDATE,
-      "tables"
-    );
-  };
+
 
   const handleEditSubmit = async (e: React.FormEvent | React.MouseEvent, id: string) => {
     e.preventDefault();
@@ -194,31 +184,24 @@ export default function Tables() {
                      </div>
                    )}
                    
-                   <button 
-                    onClick={(e) => cycleStatus(e, table.id, table.status)}
-                    className={`inline-block px-4 py-1.5 rounded-full border text-xs font-bold transition-colors cursor-pointer z-10 w-24 ${
-                      table.status === 'free' ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100' :
-                      table.status === 'busy' ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100' :
-                      'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100'
+                   <span 
+                    className={`inline-block px-4 py-1.5 rounded-full border text-[11px] font-black uppercase tracking-wider z-10 w-24 shadow-sm ${
+                      table.status === 'free' ? 'bg-[#f0fdf4] text-[#16a34a] border-[#bbf7d0]' :
+                      table.status === 'busy' ? 'bg-[#fef2f2] text-[#dc2626] border-[#fecaca]' :
+                      'bg-[#fff7ed] text-[#ea580c] border-[#fed7aa]'
                    }`}>
                       {table.status === 'free' ? 'بەتاڵ' : table.status === 'busy' ? 'سەرقاڵ' : 'حجزکراو'}
-                   </button>
+                   </span>
 
                    <div className="mt-5 flex flex-col items-center gap-2 w-full">
                      {table.cartItems && table.cartItems.length > 0 ? (
                        <div className="flex flex-col items-center w-full gap-2">
-                         <span className="text-xs font-bold text-neutral-600 bg-neutral-100/80 px-3 py-1.5 rounded-full ring-1 ring-neutral-200/50">{table.cartItems.length} داواکاری</span>
-                         {isAdmin && (
-                           <div className="w-full mt-2 pt-3 border-t border-dashed border-neutral-200">
-                             <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider mb-1">کۆی گشتی</p>
-                             <span className="text-red-600 font-black text-sm">
-                               {(table.cartItems.reduce((acc: number, item: any) => acc + ((Number(item.price) || 0) * (Number(item.quantity) || 0)), 0)).toLocaleString()} IQD
-                             </span>
-                           </div>
-                         )}
+                         <span className="text-xs font-bold text-neutral-800 bg-[#f4f4f5] px-4 py-1.5 rounded-full border border-neutral-200/50 shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)] w-full block truncate">
+                            {table.cartItems.length} داواکاری سەر مێز
+                         </span>
                        </div>
                      ) : (
-                       <span className="text-neutral-400 text-xs font-medium bg-neutral-50 px-3 py-1.5 rounded-full border border-neutral-100">هیچ داواکارییەک نییە</span>
+                       <span className="text-neutral-400 text-xs font-medium bg-neutral-50 px-4 py-1.5 rounded-full border border-neutral-100">هیچ داواکارییەک</span>
                      )}
                    </div>
                 </div>

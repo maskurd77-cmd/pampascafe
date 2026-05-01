@@ -8,6 +8,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import POS from "./pages/POS";
 import Tables from "./pages/Tables";
+import Debts from "./pages/Debts";
 import Menu from "./pages/Menu";
 import Reservations from "./pages/Reservations";
 import Expenses from "./pages/Expenses";
@@ -88,6 +89,7 @@ export default function App() {
               <Route index element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />
               <Route path="pos" element={<POS />} />
               <Route path="tables" element={<Tables />} />
+              <Route path="debts" element={<ProtectedRoute adminOnly><Debts /></ProtectedRoute>} />
               <Route path="menu" element={<ProtectedRoute adminOnly><Menu /></ProtectedRoute>} />
               <Route path="reservations" element={<ProtectedRoute adminOnly><Reservations /></ProtectedRoute>} />
               <Route path="expenses" element={<ProtectedRoute adminOnly><Expenses /></ProtectedRoute>} />

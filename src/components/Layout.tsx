@@ -12,7 +12,8 @@ import {
   Settings,
   LogOut,
   Menu as MenuIcon,
-  X
+  X,
+  WalletCards
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "../lib/utils";
@@ -21,6 +22,7 @@ const navItems = [
   { path: "/", label: "داشبۆرد", icon: LayoutDashboard, adminOnly: true },
   { path: "/pos", label: "فرۆشتن (POS)", icon: ShoppingCart },
   { path: "/tables", label: "مێزەکان", icon: Coffee },
+  { path: "/debts", label: "قەرزەکان", icon: WalletCards, adminOnly: true },
   { path: "/menu", label: "مێنۆ", icon: MenuSquare, adminOnly: true },
   { path: "/reservations", label: "حجزکردن", icon: CalendarCheck, adminOnly: true },
   { path: "/expenses", label: "خەرجییەکان", icon: Receipt, adminOnly: true },

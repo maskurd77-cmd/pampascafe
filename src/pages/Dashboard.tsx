@@ -45,14 +45,14 @@ export default function Dashboard() {
       <div className="flex flex-col gap-10 max-w-7xl mx-auto">
         
         {/* Header */}
-        <div className="flex items-end justify-between bg-white p-8 rounded-[16px] shadow-sm border border-neutral-100">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-white p-6 sm:p-8 rounded-[16px] shadow-sm border border-neutral-100 gap-4">
           <div>
-            <h1 className="text-4xl font-black tracking-tight mb-2 text-neutral-900">داشبۆرد</h1>
-            <p className="text-neutral-500 font-medium">پوختەی کارەکانی ئەمڕۆی کافێکەت بەرنامەکە بە شێوازێکی پرۆفیشناڵ کار دەکات</p>
+            <h1 className="text-3xl sm:text-4xl font-black tracking-tight mb-2 text-neutral-900">داشبۆرد</h1>
+            <p className="text-sm sm:text-base text-neutral-500 font-medium">پوختەی کارەکانی ئەمڕۆی کافێکەت بەرنامەکە بە شێوازێکی پرۆفیشناڵ کار دەکات</p>
           </div>
-          <div className="hidden sm:flex items-center gap-2 bg-neutral-50 px-4 py-2 rounded-full border border-neutral-100">
-             <span className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse"></span>
-             <span className="text-sm font-bold text-neutral-600">سیستەم کاردەکات</span>
+          <div className="flex items-center gap-2 bg-neutral-50 px-4 py-2 rounded-full border border-neutral-100">
+             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+             <span className="text-xs sm:text-sm font-bold text-neutral-600">سیستەم کاردەکات</span>
           </div>
         </div>
         
