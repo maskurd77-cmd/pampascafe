@@ -2,6 +2,7 @@ import React, { Component, ReactNode } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
+import { AppProvider } from "./hooks/useAppMode";
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
 
@@ -15,6 +16,8 @@ import Expenses from "./pages/Expenses";
 import Reports from "./pages/Reports";
 import Users from "./pages/Users";
 import Settings from "./pages/Settings";
+
+import Invoices from "./pages/Invoices";
 
 class ErrorBoundary extends Component<any, any> {
   state: { hasError: boolean; error: Error | null };
@@ -81,24 +84,27 @@ export default function App() {
     <ErrorBoundary>
       <AuthProvider>
         <Toaster position="top-center" toastOptions={{ style: { background: '#171717', color: '#fff', padding: '16px', borderRadius: '8px', fontSize: '14px', fontFamily: 'system-ui, sans-serif' } }} />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            
-            <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-              <Route index element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />
-              <Route path="pos" element={<POS />} />
-              <Route path="tables" element={<Tables />} />
-              <Route path="debts" element={<ProtectedRoute adminOnly><Debts /></ProtectedRoute>} />
-              <Route path="menu" element={<ProtectedRoute adminOnly><Menu /></ProtectedRoute>} />
-              <Route path="reservations" element={<ProtectedRoute adminOnly><Reservations /></ProtectedRoute>} />
-              <Route path="expenses" element={<ProtectedRoute adminOnly><Expenses /></ProtectedRoute>} />
-              <Route path="reports" element={<ProtectedRoute adminOnly><Reports /></ProtectedRoute>} />
-              <Route path="users" element={<ProtectedRoute adminOnly><Users /></ProtectedRoute>} />
-              <Route path="settings" element={<ProtectedRoute adminOnly><Settings /></ProtectedRoute>} />
-            </Route>
-          </Routes>
-        </BrowserRouter>
+        <AppProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              
+              <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+                <Route index element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />
+                <Route path="pos" element={<POS />} />
+                <Route path="tables" element={<Tables />} />
+                <Route path="debts" element={<ProtectedRoute adminOnly><Debts /></ProtectedRoute>} />
+                <Route path="menu" element={<ProtectedRoute adminOnly><Menu /></ProtectedRoute>} />
+                <Route path="reservations" element={<ProtectedRoute adminOnly><Reservations /></ProtectedRoute>} />
+                <Route path="expenses" element={<ProtectedRoute adminOnly><Expenses /></ProtectedRoute>} />
+                <Route path="invoices" element={<ProtectedRoute adminOnly><Invoices /></ProtectedRoute>} />
+                <Route path="reports" element={<ProtectedRoute adminOnly><Reports /></ProtectedRoute>} />
+                <Route path="users" element={<ProtectedRoute adminOnly><Users /></ProtectedRoute>} />
+                <Route path="settings" element={<ProtectedRoute adminOnly><Settings /></ProtectedRoute>} />
+              </Route>
+            </Routes>
+          </BrowserRouter>
+        </AppProvider>
       </AuthProvider>
     </ErrorBoundary>
   );

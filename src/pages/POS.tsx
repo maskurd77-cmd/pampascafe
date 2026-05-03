@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { usePOSData, MenuItem, Table } from "../hooks/usePOSData";
 import { safeAwait } from "../lib/errorHandler";
-import { collection, addDoc, serverTimestamp, doc, updateDoc, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, updateDoc, onSnapshot, query, orderBy, getDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import toast from "react-hot-toast";
 import { OperationType } from "../lib/errorHandler";
 import { useSearchParams } from "react-router-dom";
 import { Trash, Receipt, Printer, X, Tag, WalletCards, UserPlus, Coins, User } from "lucide-react";
+import { format } from "date-fns";
+import { useAppMode } from "../hooks/useAppMode";
 
 interface CartItem extends MenuItem {
   qty: number;
@@ -14,6 +16,14 @@ interface CartItem extends MenuItem {
 
 export default function POS() {
   const { categories, menuItems, tables, loading } = usePOSData();
+  const { appMode } = useAppMode();
+  
+  const filteredCategories = appMode === 'atari' 
+    ? categories 
+    : categories.filter(c => (c.department || 'cafe') === 'cafe');
+  
+  const filteredTables = tables.filter(t => (t.department || 'cafe') === appMode);
+
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [localCart, setLocalCart] = useState<CartItem[]>([]);
   const [selectedTable, setSelectedTable] = useState<string>("");
@@ -23,11 +33,35 @@ export default function POS() {
 
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [checkoutType, setCheckoutType] = useState<"cash" | "debt">("cash");
+  const [amountPaid, setAmountPaid] = useState<number | "">("");
   const [debtCustomerId, setDebtCustomerId] = useState("");
   const [newCustomerName, setNewCustomerName] = useState("");
   const [newCustomerPhone, setNewCustomerPhone] = useState("");
   const [isAddingCustomer, setIsAddingCustomer] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
+
+  const [showReceiptPreview, setShowReceiptPreview] = useState(false);
+  const [lastOrder, setLastOrder] = useState<any>(null);
+  
+  const [settings, setSettings] = useState({
+    receiptHeader: 'Pampas Cafe',
+    receiptFooter: 'سوپاس بۆ سەردانتان!'
+  });
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const docRef = doc(db, "settings", "general");
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setSettings(prev => ({ ...prev, ...docSnap.data() }));
+        }
+      } catch (error) {
+         console.error(error);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   useEffect(() => {
     const unsub = onSnapshot(query(collection(db, "customers"), orderBy("createdAt", "desc")), (snap) => {
@@ -47,7 +81,7 @@ export default function POS() {
     (selectedCategory === "all" || item.categoryId === selectedCategory) && item.available
   );
 
-  const cart = selectedTable ? (tables.find(t => t.id === selectedTable)?.cartItems || []) : localCart;
+  const cart = selectedTable ? (filteredTables.find(t => t.id === selectedTable)?.cartItems || []) : localCart;
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
   const actualDiscount = Math.min(discount, subtotal);
   const total = Math.max(0, subtotal - actualDiscount);
@@ -63,13 +97,62 @@ export default function POS() {
     }
   };
 
-  const addToCart = (item: MenuItem) => {
+  const [atariModalItem, setAtariModalItem] = useState<MenuItem | null>(null);
+  const [atariSetupType, setAtariSetupType] = useState<'match' | 'time'>('match');
+  const [matchType, setMatchType] = useState<'single' | 'double'>('single');
+  const [timeMins, setTimeMins] = useState<number>(30);
+  const [atariCustomPrice, setAtariCustomPrice] = useState<number>(1000);
+
+  const addToCartCore = (item: MenuItem & { id: string }) => {
     const existing = cart.find(i => i.id === item.id);
     if (existing) {
       updateCart(cart.map(i => i.id === item.id ? { ...i, qty: i.qty + 1 } : i));
     } else {
       updateCart([...cart, { ...item, qty: 1 }]);
     }
+  };
+
+  const addToCart = (item: MenuItem) => {
+    const cat = categories.find(c => c.id === item.categoryId);
+    const isAtari = cat?.department === 'atari';
+
+    if (appMode === 'atari' && isAtari) {
+      setAtariModalItem(item);
+      setAtariSetupType('match');
+      setMatchType('single');
+      setAtariCustomPrice(item.price || 1000);
+      setTimeMins(30);
+      return;
+    }
+
+    addToCartCore(item);
+  };
+
+  const handleConfirmAtariItem = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!atariModalItem) return;
+
+    let finalName = '';
+    let finalIdPrefix = 'atari-';
+
+    if (atariSetupType === 'match') {
+      finalName = `${atariModalItem.name} - ${matchType === 'single' ? '١ یاری سنگڵ' : '١ یاری زەوجی'}`;
+      finalIdPrefix += `match-${matchType}`;
+    } else {
+      finalName = `${atariModalItem.name} - ${timeMins} دەقە`;
+      finalIdPrefix += `time-${timeMins}`;
+    }
+
+    const newItemId = `${atariModalItem.id}-${finalIdPrefix}-${atariCustomPrice}`;
+
+    addToCartCore({
+      ...atariModalItem,
+      id: newItemId,
+      name: finalName,
+      price: atariCustomPrice
+    });
+
+    setAtariModalItem(null);
   };
 
   const removeFromCart = (id: string) => {
@@ -116,11 +199,11 @@ export default function POS() {
             </style>
           </head>
           <body>
-            <h2>پامپاس کافێ</h2>
+            <h2>${settings?.receiptHeader || 'Pampas Cafe'}</h2>
             <p>پسوولەی فرۆشتن</p>
             <div class="flex">
                <span>مێز:</span>
-               <span class="bold">${selectedTable ? tables.find(t => t.id === selectedTable)?.name : "تەیکەوێ"}</span>
+               <span class="bold">${selectedTable ? filteredTables.find(t => t.id === selectedTable)?.name : "تەیکەوێ"}</span>
             </div>
             <div class="flex">
                <span>بەروار:</span>
@@ -149,7 +232,8 @@ export default function POS() {
               <span>${total.toLocaleString()} IQD</span>
             </div>
             <hr />
-            <p style="margin-top: 20px;">سوپاس بۆ سەردانتان!</p>
+            <p style="margin-top: 20px;">${settings?.receiptFooter || 'سوپاس بۆ سەردانتان!'}</p>
+            <div style="text-align:center; font-size:10px; color:#666; margin-top:10px; font-weight:bold;">Powered by mas menu</div>
             <script>
               window.onload = function() { window.print(); window.close(); }
             </script>
@@ -164,6 +248,7 @@ export default function POS() {
     if (cart.length === 0) return toast.error("پسوولە بەتاڵە");
     setIsCheckoutModalOpen(true);
     setCheckoutType("cash");
+    setAmountPaid("");
     setIsAddingCustomer(false);
   };
 
@@ -214,15 +299,26 @@ export default function POS() {
 
     handlePrint();
 
+    const totalCost = cart.reduce((acc, item) => acc + ((item.costPrice || 0) * item.qty), 0);
     const orderData = {
       tableId: selectedTable || "takeaway",
-      items: cart.map(c => ({ id: c.id, name: c.name, price: c.price, qty: c.qty })),
+      department: appMode,
+      items: cart.map(c => ({ 
+        id: c.id, 
+        name: c.name, 
+        price: c.price, 
+        costPrice: c.costPrice || 0,
+        qty: c.qty 
+      })),
       subtotal,
       discount: actualDiscount,
       total,
+      totalCost,
+      profit: total - totalCost,
       status: checkoutType === "debt" ? "debt" : "paid",
       createdAt: serverTimestamp(),
-      paymentMethod: checkoutType
+      paymentMethod: checkoutType,
+      customerName: checkoutType === "debt" ? (isAddingCustomer ? newCustomerName : customers.find(c => c.id === debtCustomerId)?.name) : null
     };
 
     const [, err] = await safeAwait(
@@ -234,6 +330,10 @@ export default function POS() {
     );
 
     if (!err) {
+      setLastOrder({ ...orderData, id: 'RECEIPT-' + Math.random().toString(36).substr(2, 9).toUpperCase() });
+      setShowReceiptPreview(true);
+      setTimeout(() => setShowReceiptPreview(false), 2000);
+
       updateCart([]); 
       if (!selectedTable) {
         setLocalCart([]);
@@ -264,7 +364,7 @@ export default function POS() {
           >
             هەمووی
           </button>
-          {categories.map(cat => (
+          {filteredCategories.map(cat => (
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
@@ -367,7 +467,7 @@ export default function POS() {
                 className="appearance-none border border-neutral-200 rounded-[10px] pl-4 pr-10 py-2.5 text-sm font-bold bg-[#f4f4f5] focus:outline-none focus:border-black cursor-pointer w-28 text-center shadow-inner"
               >
                  <option value="">تەیکەوێ</option>
-                 {tables.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                 {filteredTables.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
               <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
                  <div className="w-2 h-2 rounded-full bg-green-500"></div>
@@ -475,6 +575,57 @@ export default function POS() {
            </div>
         </div>
       </div>
+
+      {atariModalItem && (
+        <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+           <form onSubmit={handleConfirmAtariItem} className="bg-white rounded-[24px] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+              <div className="p-5 border-b border-neutral-100 flex justify-between items-center bg-neutral-50/50">
+                 <h2 className="text-xl font-black text-neutral-800">زیادکردنی کاتی یاریکردن</h2>
+                 <button type="button" onClick={() => setAtariModalItem(null)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-neutral-200 text-neutral-500">
+                   <X size={20} />
+                 </button>
+              </div>
+              <div className="p-6 space-y-6">
+                 <div>
+                    <h3 className="font-bold text-neutral-900 mb-3 text-sm">بەرهەم: <span className="text-blue-600">{atariModalItem.name}</span></h3>
+                    <div className="flex bg-neutral-100 p-1 rounded-[12px] mb-4">
+                       <button type="button" onClick={() => setAtariSetupType('match')} className={`flex-1 py-2 text-sm font-bold rounded-[8px] transition-all ${atariSetupType === 'match' ? 'bg-white shadow-sm text-black' : 'text-neutral-500'}`}>بڕی یاری</button>
+                       <button type="button" onClick={() => setAtariSetupType('time')} className={`flex-1 py-2 text-sm font-bold rounded-[8px] transition-all ${atariSetupType === 'time' ? 'bg-white shadow-sm text-black' : 'text-neutral-500'}`}>بە دەقە</button>
+                    </div>
+
+                    {atariSetupType === 'match' ? (
+                       <div className="grid grid-cols-2 gap-3 mt-4">
+                         <button type="button" onClick={() => { setMatchType('single'); setAtariCustomPrice(atariModalItem.price || 1000); }} className={`p-3 rounded-[12px] border-2 font-bold text-sm transition-all ${matchType === 'single' ? 'border-black bg-black text-white' : 'border-neutral-200 bg-white text-neutral-600'}`}>یەک یاری (سنگڵ)</button>
+                         <button type="button" onClick={() => { setMatchType('double'); setAtariCustomPrice((atariModalItem.price || 1000) * 2); }} className={`p-3 rounded-[12px] border-2 font-bold text-sm transition-all ${matchType === 'double' ? 'border-black bg-black text-white' : 'border-neutral-200 bg-white text-neutral-600'}`}>یەک یاری (زەوجی)</button>
+                       </div>
+                    ) : (
+                       <div className="grid grid-cols-2 gap-3 mt-4">
+                         <button type="button" onClick={() => { setTimeMins(30); setAtariCustomPrice(atariModalItem.price || 1000); }} className={`p-3 rounded-[12px] border-2 font-bold text-sm transition-all ${timeMins === 30 ? 'border-black bg-black text-white' : 'border-neutral-200 bg-white text-neutral-600'}`}>٣٠ دەقە</button>
+                         <button type="button" onClick={() => { setTimeMins(60); setAtariCustomPrice((atariModalItem.price || 1000) * 2); }} className={`p-3 rounded-[12px] border-2 font-bold text-sm transition-all ${timeMins === 60 ? 'border-black bg-black text-white' : 'border-neutral-200 bg-white text-neutral-600'}`}>١ کاتژمێر (٦٠ دەقە)</button>
+                       </div>
+                    )}
+                 </div>
+
+                 {atariSetupType === 'time' && (
+                   <div>
+                      <label className="block text-xs font-bold text-neutral-500 mb-1.5">کات بە دەقە بنووسە (گەر جیاواز بوو)</label>
+                      <input type="number" min="1" value={timeMins} onChange={e => setTimeMins(Number(e.target.value))} className="w-full border border-neutral-200 rounded-[10px] px-4 py-3 font-bold focus:border-black outline-none dir-ltr" />
+                   </div>
+                 )}
+
+                 <div>
+                    <label className="block text-xs font-bold text-neutral-500 mb-1.5">نرخی ئەم داواکارییە (دینار)</label>
+                    <input type="number" min="0" value={atariCustomPrice} onChange={e => setAtariCustomPrice(Number(e.target.value))} className="w-full border border-neutral-200 rounded-[10px] px-4 py-3 font-bold focus:border-black outline-none dir-ltr text-lg bg-neutral-50" />
+                 </div>
+              </div>
+              <div className="p-5 border-t border-neutral-100 bg-neutral-50 flex justify-end gap-2 text-sm">
+                 <button type="button" onClick={() => setAtariModalItem(null)} className="px-6 py-2.5 rounded-[8px] font-bold text-neutral-600 hover:bg-neutral-200">پاشگەزبوونەوە</button>
+                 <button type="submit" className="px-8 py-2.5 rounded-[8px] font-bold bg-black text-white hover:bg-neutral-800">زیادکردن</button>
+              </div>
+           </form>
+        </div>
+      )}
+
       {/* Checkout Modal */}
       {isCheckoutModalOpen && (
         <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -524,6 +675,50 @@ export default function POS() {
                    </button>
                  </div>
               </div>
+
+              {checkoutType === "cash" && (
+                <div className="space-y-4 animate-in fade-in slide-in-from-top-2 border-t border-neutral-100 pt-4">
+                  <div>
+                    <label className="block text-sm font-bold text-neutral-700 mb-3">بڕی پارەی وەرگیراو</label>
+                    <input 
+                      type="number"
+                      dir="ltr"
+                      value={amountPaid}
+                      onChange={(e) => setAmountPaid(e.target.value === "" ? "" : Number(e.target.value))}
+                      placeholder="بڕی پارە بە دینار"
+                      className="w-full border border-neutral-200 rounded-[10px] px-4 py-3 text-lg font-black focus:outline-none focus:border-black bg-white text-left font-mono"
+                    />
+                  </div>
+                  {amountPaid !== "" && Number(amountPaid) >= total && (
+                    <div className="p-4 bg-green-50 text-green-800 rounded-[12px] border border-green-200 flex justify-between items-center">
+                      <span className="font-bold">باقی بۆ کڕیار:</span>
+                      <span className="text-xl font-black">{(Number(amountPaid) - total).toLocaleString()} <span className="text-xs">IQD</span></span>
+                    </div>
+                  )}
+                  {amountPaid !== "" && Number(amountPaid) < total && (
+                    <div className="p-4 bg-red-50 text-red-800 rounded-[12px] border border-red-200 text-sm font-bold text-center">
+                      بڕی وەرگیراو کەمترە لە کۆی گشتی
+                    </div>
+                  )}
+                  <div className="grid grid-cols-4 gap-2 pt-2">
+                     {[1000, 5000, 10000, 25000].map(val => (
+                       <button
+                         key={val}
+                         onClick={() => setAmountPaid(val)}
+                         className="py-2 bg-neutral-100 hover:bg-neutral-200 rounded-[8px] font-bold text-sm text-neutral-700 transition-colors font-mono"
+                       >
+                         {val.toLocaleString()}
+                       </button>
+                     ))}
+                     <button
+                         onClick={() => setAmountPaid(total)}
+                         className="py-2 bg-neutral-800 hover:bg-black rounded-[8px] font-bold text-sm text-white transition-colors font-mono col-span-4 mt-1"
+                       >
+                         تەواوی بڕەکە دراوە
+                       </button>
+                  </div>
+                </div>
+              )}
 
               {checkoutType === "debt" && (
                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
@@ -584,6 +779,71 @@ export default function POS() {
                </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Receipt Preview Overlay */}
+      {showReceiptPreview && lastOrder && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
+           <div className="bg-white text-black w-full max-w-[350px] p-8 shadow-2xl rounded-[4px] animate-in zoom-in-95 slide-in-from-bottom-10 duration-500 font-mono text-sm">
+              <div className="text-center border-b-2 border-black border-dashed pb-4 mb-4">
+                 <h2 className="text-2xl font-black mb-1">{settings?.receiptHeader || 'Pampas Cafe'}</h2>
+                 <p className="text-[10px] font-bold text-neutral-500 tracking-widest leading-relaxed">
+                   {settings?.receiptFooter || 'سوپاس بۆ سەردانتان!'}
+                 </p>
+                 <div className="text-[10px] font-bold text-neutral-400 mt-2 tracking-wider">Powered by mas menu</div>
+              </div>
+              
+              <div className="space-y-1 mb-4 text-[11px] font-bold">
+                 <div className="flex justify-between">
+                   <span>ژمارەی وەسڵ:</span>
+                   <span>{lastOrder.id}</span>
+                 </div>
+                 <div className="flex justify-between">
+                   <span>بەروار:</span>
+                   <span>{format(new Date(), 'yyyy/MM/dd HH:mm')}</span>
+                 </div>
+                 <div className="flex justify-between">
+                   <span>مێز:</span>
+                   <span>{lastOrder.tableId === 'takeaway' ? 'سەفەری' : lastOrder.tableId}</span>
+                 </div>
+              </div>
+
+              <div className="border-b border-black border-dashed mb-4"></div>
+
+              <div className="space-y-2 mb-6">
+                 {lastOrder.items.map((item: any, idx: number) => (
+                   <div key={idx} className="flex justify-between items-start">
+                      <div className="flex-1">
+                         <p className="font-black text-[13px]">{item.name}</p>
+                         <p className="text-[10px] text-neutral-500">{item.qty} x {item.price.toLocaleString()}</p>
+                      </div>
+                      <span className="font-black">{(item.qty * item.price).toLocaleString()}</span>
+                   </div>
+                 ))}
+              </div>
+
+              <div className="border-t-2 border-black pt-4 space-y-2">
+                 <div className="flex justify-between font-bold text-xs uppercase">
+                   <span>سەرجەم:</span>
+                   <span>{lastOrder.subtotal.toLocaleString()} د.ع</span>
+                 </div>
+                 {lastOrder.discount > 0 && (
+                   <div className="flex justify-between font-bold text-xs text-red-600">
+                     <span>داشکاندن:</span>
+                     <span>-{lastOrder.discount.toLocaleString()} د.ع</span>
+                   </div>
+                 )}
+                 <div className="flex justify-between font-black text-xl border-t border-black border-dashed pt-2 mt-2">
+                   <span>کۆ:</span>
+                   <span>{lastOrder.total.toLocaleString()}</span>
+                 </div>
+              </div>
+
+              <div className="mt-8 text-center bg-black text-white py-2 rounded-[2px] font-black text-[10px] tracking-widest animate-pulse">
+                 پەناگیررا • PRINTED SUCCESSFULLY
+              </div>
+           </div>
         </div>
       )}
     </div>

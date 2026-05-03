@@ -7,6 +7,7 @@ export interface Category {
   id: string;
   name: string;
   order: number;
+  department?: 'cafe' | 'atari';
 }
 
 export interface MenuItem {
@@ -14,6 +15,7 @@ export interface MenuItem {
   categoryId: string;
   name: string;
   price: number;
+  costPrice: number;
   available: boolean;
   imageUrl?: string;
 }
@@ -22,10 +24,12 @@ export interface Table {
   id: string;
   name: string;
   status: "free" | "busy" | "reserved";
+  department?: 'cafe' | 'atari';
   cartItems?: {
     id: string;
     name: string;
     price: number;
+    costPrice: number;
     qty: number;
   }[];
 }

@@ -4,12 +4,18 @@ import { safeAwait, OperationType } from "../lib/errorHandler";
 import { collection, addDoc, deleteDoc, doc, updateDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useNavigate } from "react-router-dom";
-import { Plus, Trash2, LayoutGrid, X, Pencil, Check } from "lucide-react";
+import { Plus, Trash2, LayoutGrid, X, Pencil, Check, ArrowRightLeft, Gamepad2, Coffee } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
+import { useAppMode } from "../hooks/useAppMode";
+import toast from "react-hot-toast";
 
 export default function Tables() {
   const { tables, loading } = usePOSData();
   const { profile } = useAuth();
+  const { appMode } = useAppMode();
+  
+  const filteredTables = tables.filter(t => (t.department || 'cafe') === appMode);
+
   const isAdmin = profile?.role === 'admin';
   const [isAdding, setIsAdding] = useState(false);
   const [newTableName, setNewTableName] = useState("");
@@ -18,12 +24,14 @@ export default function Tables() {
   const [editingTableId, setEditingTableId] = useState<string | null>(null);
   const [editTableName, setEditTableName] = useState("");
 
+  const [moveFromTableId, setMoveFromTableId] = useState<string | null>(null);
+
   const handleAddTable = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTableName.trim()) return;
 
     const [, err] = await safeAwait(
-      addDoc(collection(db, "tables"), { name: newTableName, status: "free" }),
+      addDoc(collection(db, "tables"), { name: newTableName, status: "free", department: appMode }),
       "مێز زیادکرا",
       "هەڵە لە زیادکردن",
       OperationType.CREATE,
@@ -72,11 +80,45 @@ export default function Tables() {
     setEditTableName(currentName);
   };
 
+  const handleMoveTable = async (targetTableId: string) => {
+    if (!moveFromTableId) return;
+    const sourceTable = tables.find(t => t.id === moveFromTableId);
+    const targetTable = tables.find(t => t.id === targetTableId);
+
+    if (!sourceTable || !targetTable || targetTable.status !== 'free') {
+       toast.error("مێزی مەبەست دەبێت بەتاڵ بێت");
+       return;
+    }
+
+    // Move logic
+    try {
+      await updateDoc(doc(db, "tables", targetTableId), {
+        status: sourceTable.status,
+        cartItems: sourceTable.cartItems || []
+      });
+
+      await updateDoc(doc(db, "tables", moveFromTableId), {
+        status: "free",
+        cartItems: []
+      });
+
+      toast.success(`گواسترایەوە بۆ ${targetTable.name}`);
+      setMoveFromTableId(null);
+    } catch (e) {
+      toast.error("هەڵە لە گواستنەوە");
+    }
+  };
+
+  const startMoving = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setMoveFromTableId(id);
+  };
+
   const handleDeleteAll = async () => {
-    if (tables.length === 0) return;
+    if (filteredTables.length === 0) return;
     if (window.confirm("ئاگاداری!! دڵنیای لە سڕینەوەی هەموو مێزەکان بەیەکەوە؟ ئەمە ناگەڕێتەوە.")) {
       if (window.prompt("بۆ دڵنیابوونەوە بنووسە 'confirm'") === "confirm") {
-        for (const table of tables) {
+        for (const table of filteredTables) {
           await safeAwait(deleteDoc(doc(db, "tables", table.id)), undefined, undefined, OperationType.DELETE, "tables");
         }
         window.alert("هەموو مێزەکان سڕدرانەوە");
@@ -99,7 +141,7 @@ export default function Tables() {
               <>
                 <button 
                   onClick={handleDeleteAll}
-                  disabled={tables.length === 0}
+                  disabled={filteredTables.length === 0}
                   className="flex items-center gap-2 bg-white text-red-600 px-5 py-2.5 border border-red-200 rounded-[8px] font-bold hover:bg-red-50 transition-colors disabled:opacity-50 text-sm shadow-sm"
                 >
                   <Trash2 size={18} />
@@ -136,16 +178,28 @@ export default function Tables() {
         )}
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
-          {tables.map(table => (
+          {filteredTables.map(table => (
              <div 
                 key={table.id} 
                 onClick={() => navigate(`/pos?table=${table.id}`)}
-                className="bg-white rounded-[16px] border border-neutral-100 p-6 relative group hover:border-black hover:shadow-lg transition-all cursor-pointer overflow-hidden"
+                className={`bg-white rounded-[20px] p-6 relative group cursor-pointer overflow-hidden transition-all duration-300 ${
+                  table.status === 'free' ? 'border border-neutral-200 hover:border-black hover:shadow-xl' :
+                  table.status === 'busy' ? 'border-2 border-red-500 shadow-lg shadow-red-500/10 hover:shadow-xl hover:shadow-red-500/20' :
+                  'border-2 border-orange-500 shadow-lg shadow-orange-500/10 hover:shadow-xl'
+                }`}
              >
-                <div className={`absolute top-0 right-0 w-1.5 h-full transition-colors ${table.status === 'free' ? 'bg-green-500' : table.status === 'busy' ? 'bg-red-500' : 'bg-orange-500'}`}></div>
+                <div className={`absolute top-0 right-0 w-2 h-full transition-colors ${table.status === 'free' ? 'bg-green-500' : table.status === 'busy' ? 'bg-red-500' : 'bg-orange-500'}`}></div>
                 
                 {isAdmin && (
                   <div className="absolute top-3 left-3 flex gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-all z-10">
+                    <button 
+                       onClick={(e) => startMoving(e, table.id)}
+                       className="text-neutral-400 hover:text-black hover:bg-neutral-100 bg-white border border-neutral-100 w-8 h-8 rounded-full flex items-center justify-center shadow-sm"
+                       title="گواستنەوەی مێز"
+                       disabled={table.status === 'free'}
+                    >
+                       <ArrowRightLeft size={14} />
+                    </button>
                     <button 
                        onClick={(e) => startEditing(e, table.id, table.name)}
                        className="text-neutral-400 hover:text-black hover:bg-neutral-100 bg-white border border-neutral-100 w-8 h-8 rounded-full flex items-center justify-center shadow-sm"
@@ -179,8 +233,14 @@ export default function Tables() {
                        </div>
                      </div>
                    ) : (
-                     <div className="w-20 h-20 md:w-24 md:h-24 border-[3px] border-neutral-100 rounded-full flex items-center justify-center text-xl md:text-2xl font-black mb-5 bg-gradient-to-b from-white to-neutral-50 shadow-sm group-hover:shadow-md group-hover:border-black/10 transition-all">
-                        <span className="text-neutral-800">{table.name}</span>
+                     <div className={`w-full aspect-video border-[2px] border-neutral-100 rounded-[12px] flex flex-col items-center justify-center font-black mb-5 bg-gradient-to-br shadow-sm group-hover:shadow-md group-hover:border-black/30 transition-all gap-2 ${appMode === 'atari' ? 'from-neutral-800 to-black text-white relative' : 'from-neutral-50 to-neutral-100 text-neutral-800'}`}>
+                        {appMode === 'atari' && <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>}
+                        <span className={`text-xl md:text-2xl ${appMode === 'atari' ? 'text-white' : 'text-neutral-800'}`}>{table.name}</span>
+                        {appMode === 'atari' ? (
+                          <Gamepad2 size={24} className="text-white/50" strokeWidth={1.5} />
+                        ) : (
+                          <Coffee size={24} className="text-neutral-300" strokeWidth={1.5} />
+                        )}
                      </div>
                    )}
                    
@@ -207,7 +267,7 @@ export default function Tables() {
                 </div>
              </div>
           ))}
-          {tables.length === 0 && (
+          {filteredTables.length === 0 && (
              <div className="col-span-full py-20 flex flex-col items-center justify-center text-neutral-400 bg-white rounded-[16px] border border-neutral-100 border-dashed gap-4">
                 <div className="w-16 h-16 bg-neutral-50 rounded-full flex items-center justify-center">
                    <LayoutGrid size={24} className="text-neutral-300" />
@@ -217,6 +277,49 @@ export default function Tables() {
           )}
         </div>
       </div>
+
+      {/* Move Table Modal */}
+      {moveFromTableId && (
+        <div className="fixed inset-0 bg-neutral-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+           <div className="bg-white rounded-[24px] w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+              <div className="p-6 border-b border-neutral-100 flex justify-between items-center bg-neutral-50/50">
+                 <h3 className="text-xl font-black flex items-center gap-2">
+                   <ArrowRightLeft size={24} className="text-neutral-500" />
+                   گواستنەوەی مێز
+                 </h3>
+                 <button onClick={() => setMoveFromTableId(null)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-neutral-200 text-neutral-500">
+                   <X size={20} />
+                 </button>
+              </div>
+              <div className="p-6">
+                 <p className="text-neutral-500 mb-6 font-bold text-center">مێزی مەبەست هەڵبژێرە بۆ گواستنەوەی {filteredTables.find(t=>t.id===moveFromTableId)?.name}</p>
+                 <div className="grid grid-cols-3 gap-3 max-h-[300px] overflow-y-auto pr-2">
+                    {filteredTables.map(t => {
+                      const isFree = t.status === 'free';
+                      if (t.id === moveFromTableId) return null;
+                      return (
+                        <button 
+                          key={t.id}
+                          disabled={!isFree}
+                          onClick={() => handleMoveTable(t.id)}
+                          className={`p-4 rounded-[12px] border-2 font-black text-sm flex flex-col items-center gap-2 transition-all ${
+                            isFree 
+                              ? 'border-neutral-100 hover:border-black bg-white text-neutral-900' 
+                              : 'border-neutral-50 bg-neutral-50 text-neutral-300 opacity-50 cursor-not-allowed'
+                          }`}
+                        >
+                           <span className="text-xs">{t.name}</span>
+                        </button>
+                      );
+                    })}
+                 </div>
+              </div>
+              <div className="p-6 border-t border-neutral-100 bg-neutral-50 flex justify-end">
+                 <button onClick={() => setMoveFromTableId(null)} className="px-6 py-2.5 rounded-[8px] font-bold text-neutral-600 hover:bg-neutral-100 transition-colors">پاشگەزبوونەوە</button>
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 }

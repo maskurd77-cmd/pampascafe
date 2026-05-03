@@ -4,6 +4,7 @@ import { db } from "../lib/firebase";
 import { safeAwait, OperationType, handleFirestoreError } from "../lib/errorHandler";
 import { Trash, Plus, Receipt, CalendarClock, User, DollarSign, Wallet } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
+import { useAppMode } from "../hooks/useAppMode";
 
 interface Expense {
   id: string;
@@ -11,10 +12,12 @@ interface Expense {
   amount: number;
   createdAt: any;
   user: string;
+  department?: 'cafe' | 'atari';
 }
 
 export default function Expenses() {
   const { profile } = useAuth();
+  const { appMode } = useAppMode();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [formData, setFormData] = useState({ description: "", amount: "" });
@@ -22,10 +25,11 @@ export default function Expenses() {
   useEffect(() => {
     const q = query(collection(db, "expenses"), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
-      setExpenses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Expense)));
+      const allExpenses = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Expense));
+      setExpenses(allExpenses.filter(e => (e.department || 'cafe') === appMode));
     }, error => handleFirestoreError(error, OperationType.LIST, "expenses"));
     return () => unsub();
-  }, []);
+  }, [appMode]);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,7 +40,8 @@ export default function Expenses() {
          description: formData.description, 
          amount: Number(formData.amount),
          createdAt: serverTimestamp(),
-         user: profile?.name || "ستاف"
+         user: profile?.name || "ستاف",
+         department: appMode
       }),
       "تۆمارکرا",
       "هەڵە لە ناو تۆمارکردن",

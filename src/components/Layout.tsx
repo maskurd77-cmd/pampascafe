@@ -1,5 +1,6 @@
 import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useAppMode } from "../hooks/useAppMode";
 import { 
   LayoutDashboard, 
   Coffee, 
@@ -8,12 +9,14 @@ import {
   CalendarCheck, 
   Users, 
   Receipt, 
+  FileText,
   BarChart3, 
   Settings,
   LogOut,
   Menu as MenuIcon,
   X,
-  WalletCards
+  WalletCards,
+  Gamepad2
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "../lib/utils";
@@ -26,6 +29,7 @@ const navItems = [
   { path: "/menu", label: "مێنۆ", icon: MenuSquare, adminOnly: true },
   { path: "/reservations", label: "حجزکردن", icon: CalendarCheck, adminOnly: true },
   { path: "/expenses", label: "خەرجییەکان", icon: Receipt, adminOnly: true },
+  { path: "/invoices", label: "وەسلەکان", icon: FileText, adminOnly: true },
   { path: "/reports", label: "ڕاپۆرتەکان", icon: BarChart3, adminOnly: true },
   { path: "/users", label: "بەکارهێنەران", icon: Users, adminOnly: true },
   { path: "/settings", label: "ڕێکخستنەکان", icon: Settings, adminOnly: true },
@@ -33,6 +37,7 @@ const navItems = [
 
 export default function Layout() {
   const { profile, logout } = useAuth();
+  const { appMode, setAppMode } = useAppMode();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -53,9 +58,19 @@ export default function Layout() {
           <div className="w-8 h-8 bg-black text-white flex items-center justify-center rounded-[8px] font-black text-xs tracking-wider">PM</div>
           <h1 className="text-lg font-black tracking-tight">Pampas Cafe</h1>
         </div>
-        <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2 text-neutral-600 bg-neutral-50 rounded-[8px] active:scale-95 transition-transform">
-          {mobileOpen ? <X size={20} /> : <MenuIcon size={20} />}
-        </button>
+        <div className="flex items-center gap-2">
+           <div className="flex items-center gap-1 bg-neutral-100 p-0.5 rounded-full">
+             <button onClick={() => setAppMode('cafe')} className={cn("px-2 py-1.5 rounded-full text-[10px] font-bold transition-all flex border items-center gap-1", appMode === 'cafe' ? "bg-white text-black border-neutral-200 shadow-sm" : "text-neutral-500 border-transparent")}>
+               ☕ کافێ
+             </button>
+             <button onClick={() => setAppMode('atari')} className={cn("px-2 py-1.5 rounded-full text-[10px] font-bold transition-all flex border items-center gap-1", appMode === 'atari' ? "bg-black text-white border-black shadow-sm" : "text-neutral-500 border-transparent")}>
+               🎮 ئاتاری
+             </button>
+           </div>
+           <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2 text-neutral-600 bg-neutral-50 rounded-[8px] active:scale-95 transition-transform">
+             {mobileOpen ? <X size={20} /> : <MenuIcon size={20} />}
+           </button>
+        </div>
       </div>
 
       {/* Sidebar */}
@@ -130,7 +145,22 @@ export default function Layout() {
           </div>
           <div className="flex gap-4 items-center">
             
-            <div className="h-8 w-px bg-neutral-100 mx-2"></div>
+            <div className="hidden sm:flex items-center gap-1 bg-neutral-100 p-1 rounded-full">
+              <button 
+                onClick={() => setAppMode('cafe')} 
+                className={cn("px-4 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-2 border", appMode === 'cafe' ? "bg-white text-black border-neutral-200 shadow-sm" : "text-neutral-500 border-transparent hover:text-black")}
+              >
+                ☕ کافێ
+              </button>
+              <button 
+                onClick={() => setAppMode('atari')} 
+                className={cn("px-4 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-2 border", appMode === 'atari' ? "bg-black text-white border-black shadow-sm" : "text-neutral-500 border-transparent hover:text-black")}
+              >
+                🎮 ئاتاری
+              </button>
+            </div>
+
+            <div className="hidden sm:block h-8 w-px bg-neutral-100 mx-2"></div>
             
             <div className="flex items-center gap-3 bg-neutral-50 pr-4 pl-1.5 py-1.5 rounded-[12px] border border-neutral-100">
               <div className="text-left leading-tight">
