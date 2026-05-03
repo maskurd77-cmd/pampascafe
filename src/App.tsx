@@ -1,5 +1,5 @@
 import React, { Component, ReactNode } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { AppProvider } from "./hooks/useAppMode";
@@ -85,7 +85,7 @@ export default function App() {
       <AuthProvider>
         <Toaster position="top-center" toastOptions={{ style: { background: '#171717', color: '#fff', padding: '16px', borderRadius: '8px', fontSize: '14px', fontFamily: 'system-ui, sans-serif' } }} />
         <AppProvider>
-          <BrowserRouter>
+          <HashRouter>
             <Routes>
               <Route path="/login" element={<Login />} />
               
@@ -103,7 +103,7 @@ export default function App() {
                 <Route path="settings" element={<ProtectedRoute adminOnly><Settings /></ProtectedRoute>} />
               </Route>
             </Routes>
-          </BrowserRouter>
+          </HashRouter>
         </AppProvider>
       </AuthProvider>
     </ErrorBoundary>
